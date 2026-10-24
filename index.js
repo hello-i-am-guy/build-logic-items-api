@@ -1,8 +1,8 @@
 const express = require('express');
-const fetch = require('node-fetch');
-
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+app.use(express.json());
 
 // Mapping characters to Build Logic 6-bit input codes
 const CHARACTER_MAP = {
@@ -17,61 +17,58 @@ const CHARACTER_MAP = {
   ';': '101001', '/': '101010'
 };
 
-// Queue to hold 8-bit binary string representations to stream out
 let bitQueue = [];
 let isFetching = false;
 
 /**
  * Converts a character into an 8-bit binary string:
- * Bit 0: Shift state (1 = uppercase/shifted symbol, 0 = lowercase/default)
- * Bit 1: Unused / Padding (0)
- * Bits 2-7: 6-bit character code on Text Panel
+ * Bit 0: Shift state (1 = uppercase, 0 = lowercase)
+ * Bit 1: Padding (0)
+ * Bits 2-7: 6-bit character code
  */
 function charToBits(char) {
+  if (!char) return "00000000";
   const isUpper = char >= 'A' && char <= 'Z';
   const lowerChar = char.toLowerCase();
-
+  
   const shiftBit = isUpper ? '1' : '0';
-  const code = CHARACTER_MAP[lowerChar] || '111111'; // Default to empty if not mapped
-
-  return shiftBit + '0' + code;
+  const code = CHARACTER_MAP[lowerChar] || '111111';
+  
+  return `${shiftBit}0${code}`.slice(0, 8);
 }
 
 /**
- * Fetches item list from external PHP API, filters named blocks,
- * and fills the queue with character bit sequences.
+ * Fetches the item list, filters named blocks, and populates the bit queue
  */
 async function loadItemsIntoQueue() {
   isFetching = true;
-  bitQueue = []; // Clear previous queue
+  bitQueue = [];
 
   try {
     const response = await fetch('https://tomtom.worldlite.ca/BuildLogic/GetItemsList.php');
     const data = await response.json();
 
-    // Collect all items with valid non-empty names
+    // Extract names from various JSON structures
     let namedItems = [];
     if (Array.isArray(data)) {
       namedItems = data.map(item => item.name || item.itemName || item.title).filter(Boolean);
-    } else if (typeof data === 'object') {
+    } else if (data && typeof data === 'object') {
       namedItems = Object.values(data)
         .map(item => typeof item === 'string' ? item : (item.name || item.itemName))
         .filter(Boolean);
     }
 
-    // Join item names with separator spaces
-    const displayText = namedItems.join(" - ");
+    // Join all item names separated by dashes
+    const displayText = namedItems.length > 0 ? namedItems.join(" - ") : "NO ITEMS FOUND";
 
-    // Convert string to 8-bit frames into the queue
+    // Convert string to character frames with pacing buffers
     for (let char of displayText) {
       bitQueue.push(charToBits(char));
-      // Insert a blank/off frame between characters to allow crisp display updates at 0.1s interval
-      bitQueue.push("00000000");
+      bitQueue.push("00000000"); // Blank frame spacing for 0.1s interval pacing
     }
   } catch (error) {
     console.error("Error fetching items list:", error);
-    // Push error message to queue in case of failure
-    const errorText = "ERROR FETCHING ITEMS";
+    const errorText = "FETCH ERROR";
     for (let char of errorText) {
       bitQueue.push(charToBits(char));
       bitQueue.push("00000000");
@@ -81,20 +78,23 @@ async function loadItemsIntoQueue() {
   }
 }
 
-// GET Endpoint for the HTTP Transmitter
+// Root Route (Prevents "Cannot GET /" errors)
+app.get('/', (req, res) => {
+  res.send("Build Logic Non-AI Items API is running! Poll /api/display from your HTTP Transmitter.");
+});
+
+// Transmitter Polling Endpoint
 app.get('/api/display', async (req, res) => {
-  // If queue is empty and not currently fetching, fetch fresh item list
   if (bitQueue.length === 0 && !isFetching) {
     await loadItemsIntoQueue();
   }
 
-  // Retrieve next 8-bit character binary frame, or default blank frame
+  // Shift next 8-bit frame out, or return blank frame if empty
   const nextVal = bitQueue.length > 0 ? bitQueue.shift() : "00000000";
 
-  // Strict 8-character binary format JSON output
   res.json({ value: nextVal });
 });
 
 app.listen(PORT, () => {
-  console.log(`Build Logic API Server running on port ${PORT}`);
+  console.log(`Non-AI Server running on port ${PORT}`);
 });
