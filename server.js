@@ -140,6 +140,8 @@ app.get('/typewriter/menu', ensureAuthenticated, (req, res) => {
         .admin-badge { background: #ef4444; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; }
         .admin-link { display: block; margin-top: 20px; text-align: center; background: #7c3aed; color: #fff; padding: 10px; border-radius: 6px; text-decoration: none; font-weight: bold; }
         .admin-link:hover { background: #6d28d9; }
+        .quiz-button { display: inline-block; margin-top: 18px; padding: 12px 18px; background: #f59e0b; color:#111827; text-decoration:none; border-radius:6px; font-weight:bold; text-align:center; }
+        .footer-note { margin-top: 24px; text-align: center; color: #cbd5e1; font-size: 12px; }
       </style>
     </head>
     <body>
@@ -159,7 +161,11 @@ app.get('/typewriter/menu', ensureAuthenticated, (req, res) => {
         <button onclick="queueText()">Transmit</button>
         <div id="status" style="margin-top: 15px; text-align: center; font-size: 14px;"></div>
 
+        <a href="https://quiz-club-lol-1.on.websim.com" class="quiz-button" target="_blank" rel="noopener noreferrer">Open Quiz Club</a>
+
         ${isOwner ? '<a href="/admin/dashboard" class="admin-link">🔒 Open Owner Admin Panel</a>' : ''}
+
+        <div class="footer-note">ali_ayoub5 made this omagad</div>
       </div>
 
       <script>
